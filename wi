@@ -1,0 +1,42 @@
+#!/usr/bin/expect
+
+#################
+#	Auto-rdp Windows pour les feignasses
+#	1- créer un fichier secrets avec les logins (login "espace" pwd), un par ligne
+#	2- Crypter le fichier avec la commande gpg --encrypt --output secrets.gpg -r "user" secrets
+#	3- Supprimer le fichier secrets en clair
+#	4- FreeRDP version 2.0.0-dev
+#	5- alias wi='/usr/bin/expect /home/paul/scripts/wi'
+# ################
+
+set timeout -1
+set homeDir $env(HOME)
+set secrets "$homeDir/scripts/secrets.gpg"
+set user "user"
+set host [lindex $argv 0];
+
+if {[llength $argv] != 1} {
+  send_user "Usage: wi host \n"
+  exit 1
+}
+
+
+if {[regexp {(^[2][5][0-5].|^[2][0-4][0-9].|^[1][0-9][0-9].|^[0-9][0-9].|^[0-9].)([2][0-5][0-5].|[2][0-4][0-9].|[1][0-9][0-9].|[0-9][0-9].|[0-9].)([2][0-5][0-5].|[2][0-4][0-9].|[1][0-9][0-9].|[0-9][0-9].|[0-9].)([2][0-5][0-5]|[2][0-4][0-9]|[1][0-9][0-9]|[0-9][0-9]|[0-9])$} $host match p1 p2 p3 p4]} {
+  set ip $p1$p2$p3$p4
+} else {
+	set ip [ exec host $host | grep -v arpa | awk "{print \$4}"  ]
+}
+
+set pass [ exec gpg -o - -d $secrets 2> /dev/null | grep $user | awk "{print \$2}" ]
+send "$ip\n"
+spawn /usr/bin/xfreerdp +clipboard /u:user /size:1664x936 /kbd:0x0000040C /title:$host /v:$ip /drive:home,$homeDir/
+expect {
+	"(Y/N)" {
+		send "Y\n"
+		expect "assword:" { send "$pass\n" }
+		}
+	"assword:" {
+		send "$pass\n"
+		}
+}
+interact
